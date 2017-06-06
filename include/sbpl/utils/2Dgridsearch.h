@@ -57,8 +57,8 @@ enum SBPL_2DGRIDSEARCH_OPENTYPE
     SBPL_2DGRIDSEARCH_OPENTYPE_HEAP, SBPL_2DGRIDSEARCH_OPENTYPE_SLIDINGBUCKETS
 };
 
-//#define SBPL_2DGRIDSEARCH_HEUR2D(x,y)  ((int)(1000*cellSize_m_*sqrt((double)((x-goalX_)*(x-goalX_)+(y-goalY_)*(y-goalY_)))))
-#define SBPL_2DGRIDSEARCH_HEUR2D(x,y)  ((int)(1000*cellSize_m_*__max(abs(x-goalX_),abs(y-goalY_))))
+#define SBPL_2DGRIDSEARCH_HEUR2D(x,y)  ((int)(1000*cellSize_m_*sqrt((double)((x-goalX_)*(x-goalX_)+(y-goalY_)*(y-goalY_)))))
+//#define SBPL_2DGRIDSEARCH_HEUR2D(x,y)  ((int)(1000*cellSize_m_*__max(abs(x-goalX_),abs(y-goalY_))))
 
 /**
  * \brief search state corresponding to each 2D cell

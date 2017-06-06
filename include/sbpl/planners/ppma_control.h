@@ -26,36 +26,24 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef _PPMA_PLANNER_H_
-#define _PPMA_PLANNER_H_
+#ifndef _PPMA_CONTROL_PLANNER_H_
+#define _PPMA_CONTROL_PLANNER_H_
 
 #include "../../sbpl/headers.h"
 #include <sbpl/discrete_space_information/environment_ppma.h>
 
-
-#include "/usr/local/include/ompl/base/Planner.h"
 // often useful headers:
-#include "/usr/local/include/ompl/util/RandomNumbers.h"
-#include "/usr/local/include/ompl/tools/config/SelfConfig.h"
-#include "/usr/local/include/ompl/geometric/planners/PlannerIncludes.h"
-#include "/usr/local/include/ompl/datastructures/NearestNeighbors.h"
-#include "/usr/local/include/ompl/base/goals/GoalSampleableRegion.h"
-#include "/usr/local/include/ompl/base/Cost.h"
-#include "/usr/local/include/ompl/control/planners/rrt/RRT.h"
-#include "/usr/local/include/ompl/geometric/PathGeometric.h"
-#include "/usr/local/include/ompl/base/ProblemDefinition.h"
+#include <ompl/util/RandomNumbers.h>
+#include <ompl/tools/config/SelfConfig.h>
+#include "ompl/datastructures/NearestNeighbors.h"
+#include "ompl/control/planners/PlannerIncludes.h"
+#include <ompl/base/goals/GoalSampleableRegion.h>
 
 #include <queue>
 
-class PPMALazyListElement;
+class PPMAControlLazyListElement;
 
-enum class PlannerMode {
-  H_STAR = 0,
-  wA_STAR,
-  RRT
-};
-
-class PPMAState: public AbstractSearchState {
+class PPMAControlState: public AbstractSearchState {
  public:
   int id;
   unsigned int v;
@@ -63,33 +51,32 @@ class PPMAState: public AbstractSearchState {
   int h;
   short unsigned int iteration_closed;
   short unsigned int replan_number;
-  PPMAState *best_parent;
-  PPMAState *expanded_best_parent;
+  PPMAControlState *best_parent;
+  PPMAControlState *expanded_best_parent;
   bool in_incons;
-  std::priority_queue<PPMALazyListElement> lazyList;
+  std::priority_queue<PPMAControlLazyListElement> lazyList;
   bool isTrueCost;
 };
 
 
-class PPMALazyListElement {
+class PPMAControlLazyListElement {
  public:
-  PPMALazyListElement(PPMAState *p, int ec, bool itc) {
+  PPMAControlLazyListElement(PPMAControlState *p, int ec, bool itc) {
     parent = p;
     edgeCost = ec;
     isTrueCost = itc;
   }
-  bool operator< (const PPMALazyListElement &other) const {
+  bool operator< (const PPMAControlLazyListElement &other) const {
     return (parent->v + edgeCost > other.parent->v + other.edgeCost);
   }
-  PPMAState *parent;
+  PPMAControlState *parent;
   int edgeCost;
   bool isTrueCost;
 };
 
-class PPMAPlanner : public SBPLPlanner, public ompl::base::Planner {
+class PPMAControlPlanner : public SBPLPlanner, public ompl::base::Planner {
 
  public:
-   PlannerMode planner_mode_;
   
   ReplanParams replan_params;
   std::vector<int> solution_stateIDs_V;
@@ -106,10 +93,10 @@ class PPMAPlanner : public SBPLPlanner, public ompl::base::Planner {
   };
 
   virtual int replan(int start, int goal, std::vector<int> *solution_stateIDs_V,
-                     ReplanParams params, int *solcost, double &totalT);
-  virtual int replan(std::vector<int> *solution_stateIDs_V, ReplanParams params, double &totalT);
+                     ReplanParams params, int *solcost);
+  virtual int replan(std::vector<int> *solution_stateIDs_V, ReplanParams params);
   virtual int replan(std::vector<int> *solution_stateIDs_V, ReplanParams params,
-                     int *solcost, double &totalT);
+                     int *solcost);
 
   void interrupt();
 
@@ -139,9 +126,9 @@ class PPMAPlanner : public SBPLPlanner, public ompl::base::Planner {
     printf("Not supported. Use ReplanParams");
   };
 
-  PPMAPlanner(const ompl::base::SpaceInformationPtr &si,
+  PPMAControlPlanner(const ompl::control::SpaceInformationPtr &si,
                EnvironmentPPMA *environment, bool bforwardsearch, double alloc_time, ReplanParams* get_params);
-  ~PPMAPlanner();
+  ~PPMAControlPlanner();
 
   virtual void get_search_stats(std::vector<PlannerStats> *s);
 
@@ -166,34 +153,40 @@ class PPMAPlanner : public SBPLPlanner, public ompl::base::Planner {
   double getRange() const {
     return maxDistance_;
   }
+  /** \brief Return true if the intermediate states generated along motions are to be added to the tree itself */
+  bool getIntermediateStates() const
+  {
+      return addIntermediateStates_;
+  }
+
+  /** \brief Specify whether the intermediate states generated along motions are to be added to the tree itself */
+  void setIntermediateStates(bool addIntermediateStates)
+  {
+      addIntermediateStates_ = addIntermediateStates;
+            }
   template<template<typename T> class NN>
   void setNearestNeighbors() {
-    monolithic_tree_.reset(new NN<Motion *>());
+    monolithic_tree_.reset(new NN<ControlMotion *>());
+    lattice_tree_.reset(new NN<ControlMotion *>());
   }
   virtual void setup();
-
-  void setpdefstartgoal(std::vector<double> start, std::vector<double> goal);
-
-  std::ofstream output;
-  std::string results_file;
 
 
  protected:
   //data structures (open and incons lists)
   CHeap heap;
-  std::vector<PPMAState *> incons;
-  std::vector<PPMAState *> states;
+  std::vector<PPMAControlState *> incons;
+  std::vector<PPMAControlState *> states;
 
   EnvironmentPPMA* env_;
 
   //params
   ReplanParams params;
   bool bforwardsearch; //if true, then search proceeds forward, otherwise backward
-  PPMAState *goal_state;
-  PPMAState *start_state;
+  PPMAControlState *goal_state;
+  PPMAControlState *start_state;
   int goal_state_id;
   int start_state_id;
-  std::string sbpl_planner_id_;
 
   //search member variables
   double eps;
@@ -213,15 +206,13 @@ class PPMAPlanner : public SBPLPlanner, public ompl::base::Planner {
 
   bool interruptFlag;
 
-  ros::NodeHandle ph_;
-
-  virtual PPMAState *GetState(int id);
-  virtual void ExpandState(PPMAState *parent);
-  virtual void EvaluateState(PPMAState *parent);
-  void getNextLazyElement(PPMAState *state);
-  void insertLazyList(PPMAState *state, PPMAState *parent, int edgeCost,
+  virtual PPMAControlState *GetState(int id);
+  virtual void ExpandState(PPMAControlState *parent);
+  virtual void EvaluateState(PPMAControlState *parent);
+  void getNextLazyElement(PPMAControlState *state);
+  void insertLazyList(PPMAControlState *state, PPMAControlState *parent, int edgeCost,
                       bool isTrueCost);
-  void putStateInHeap(PPMAState *state);
+  void putStateInHeap(PPMAControlState *state);
 
   virtual int ImprovePath();
 
@@ -233,38 +224,45 @@ class PPMAPlanner : public SBPLPlanner, public ompl::base::Planner {
   virtual bool Search(std::vector<int> &pathIds, int &PathCost);
 
   //OMPL Stuff
-  class Motion {
+  class ControlMotion {
    public:
-    Motion() : state(NULL), parent(NULL) {
+    ControlMotion() : state(NULL), parent(NULL) {
     }
-    Motion(const ompl::base::SpaceInformationPtr &si) : state(si->allocState()),
-      parent(NULL), g(INFINITECOST), lattice_state(false) {
+    ControlMotion(const ompl::control::SpaceInformation *si) : state(si->allocState()), control(si->allocControl()),
+      parent(NULL), g(INFINITECOST), lattice_state(false), steps(0) {
     }
-    ~Motion() {
+    ~ControlMotion() {
     }
     ompl::base::State *state;
-    Motion *parent;
+    ControlMotion *parent;
+    ompl::control::Control *control;
+    unsigned int steps;
     int g;
     bool lattice_state;
   };
   void freeMemory();
-  double distanceFunction(const Motion *a, const Motion *b) const {
+  double distanceFunction(const ControlMotion *a, const ControlMotion *b) const {
     return si_->distance(a->state, b->state);
   }
 
   // Add the edge between state->parent to state to the monolithic tree. This
   // assumes that state->parent already exists in the tree.
-  void AddToMonolithicTree(PPMAState * state);
+  void AddToMonolithicTree(PPMAControlState * state);
 
   ompl::base::StateSamplerPtr sampler_;
-  boost::shared_ptr<ompl::NearestNeighbors<Motion*>> monolithic_tree_;
+  ompl::control::DirectedControlSamplerPtr control_sampler_;
+  boost::shared_ptr<ompl::NearestNeighbors<ControlMotion*>> monolithic_tree_;
+  boost::shared_ptr<ompl::NearestNeighbors<ControlMotion*>> lattice_tree_;
   double goalBias_;
   double maxDistance_;
+  bool addIntermediateStates_;
   ompl::RNG rng_;
-  Motion *lastGoalMotion_;
+  ControlMotion *lastGoalMotion_;
   ompl::base::Goal *goal_;
   ompl::base::GoalSampleableRegion *goal_s_;
-  //ompl::base::ProblemDefinitionPtr pdef_;
+
+  // base::SpaceInformation cast as control::SpaceInformation for convenice.
+  const ompl::control::SpaceInformation *si_c_;
 };
 
 #endif

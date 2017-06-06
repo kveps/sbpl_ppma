@@ -43,14 +43,17 @@
 #include <crtdbg.h>
 #endif
 
+#include <sbpl/discrete_space_information/Chameleon.h>
 #include <sbpl/discrete_space_information/environment.h>
 #include <sbpl/discrete_space_information/environment_nav2D.h>
 #include <sbpl/discrete_space_information/environment_nav2Duu.h>
 #include <sbpl/discrete_space_information/environment_navxythetalat.h>
 #include <sbpl/discrete_space_information/environment_navxythetamlevlat.h>
+#include <sbpl/discrete_space_information/environment_ompl.h>
 #include <sbpl/discrete_space_information/environment_robarm.h>
 #include <sbpl/discrete_space_information/environment_XXX.h>
 #include <sbpl/discrete_space_information/environment_mha.h>
+#include <sbpl/discrete_space_information/environment_ppma.h>
 #include <sbpl/planners/adplanner.h>
 #include <sbpl/planners/ANAplanner.h>
 #include <sbpl/planners/araplanner.h>
@@ -60,6 +63,8 @@
 #include <sbpl/planners/viplanner.h>
 #include <sbpl/planners/lazyARA.h>
 #include <sbpl/planners/mha_planner.h>
+#include <sbpl/planners/ppma.h>
+ #include <sbpl/planners/ppma_control.h>
 #include <sbpl/utils/2Dgridsearch.h>
 #include <sbpl/utils/heap.h>
 #include <sbpl/utils/list.h>
@@ -70,6 +75,7 @@
 #include <sbpl/utils/sbpl_bfs_2d.h>
 #include <sbpl/utils/sbpl_bfs_3d.h>
 #include <sbpl/utils/utils.h>
+#include <sbpl/utils/BenchmarkTypes.h>
 
 #endif
 

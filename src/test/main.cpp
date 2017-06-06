@@ -10,7 +10,7 @@
  *     * Redistributions in binary form must reproduce the above copyright
  *       notice, this list of conditions and the following disclaimer in the
  *       documentation and/or other materials provided with the distribution.
- *     * Neither the name of the University of Pennsylvania nor the names of its
+ *     * Neither the name of the Carnegie Mellon University nor the names of its
  *       contributors may be used to endorse or promote products derived from
  *       this software without specific prior written permission.
  *
@@ -95,7 +95,7 @@ PlannerType StrToPlannerType(const char* str)
 
 enum EnvironmentType
 {
-    INVALID_ENV_TYPE = -1, ENV_TYPE_2D, ENV_TYPE_2DUU, ENV_TYPE_XYTHETA, ENV_TYPE_XYTHETAMLEV, ENV_TYPE_ROBARM,
+    INVALID_ENV_TYPE = -1, ENV_TYPE_2D, ENV_TYPE_2DUU, ENV_TYPE_XYTHETA, ENV_TYPE_XYTHETAMLEV, ENV_TYPE_ROBARM, ENV_TYPE_OMPL,
 
     NUM_ENV_TYPES
 };
@@ -113,6 +113,8 @@ std::string EnvironmentTypeToStr(EnvironmentType environmentType)
         return std::string("xythetamlev");
     case ENV_TYPE_ROBARM:
         return std::string("robarm");
+    case ENV_TYPE_OMPL:
+        return std::string("ompl");
     default:
         return std::string("invalid");
     }
@@ -134,6 +136,9 @@ EnvironmentType StrToEnvironmentType(const char* str)
     }
     else if (!strcmp(str, "robarm")) {
         return ENV_TYPE_ROBARM;
+    }
+    else if (!strcmp(str, "ompl")) {
+        return ENV_TYPE_OMPL;
     }
     else {
         return INVALID_ENV_TYPE;
@@ -187,7 +192,7 @@ void PrintHelp(char** argv)
     printf("                          it approaches them.\n");
     printf("[--env=<env_t>]           (optional) Select an environment type to choose what\n");
     printf("                          example to run. The default is \"xytheta\".\n");
-    printf("<env_t>                   One of 2d, xytheta, xythetamlev, robarm.\n");
+    printf("<env_t>                   One of 2d, xytheta, ompl, xythetamlev, robarm.\n");
     printf("[--planner=<planner_t>]   (optional) Select a planner to use for the example.\n");
     printf("                          The default is \"arastar\".\n");
     printf("<planner_t>               One of arastar, adstar, rstar, anastar.\n");
@@ -240,7 +245,7 @@ std::string CheckSearchDirection(int numOptions, char** argv)
             return s;
         }
     }
-    return std::string("backward");
+    return std::string("forward");
 }
 
 /*******************************************************************************
@@ -560,25 +565,26 @@ int planxythetalat(PlannerType plannerType, char* envCfgFilename, char* motPrimF
         throw new SBPL_Exception();
     }
 
-    // write the discrete solution to file
-    //	for (size_t i = 0; i < solution_stateIDs_V.size(); i++) {
-    //		int x;
-    //		int y;
-    //		int theta;
-    //		environment_navxythetalat.GetCoordFromState(solution_stateIDs_V[i], x, y, theta);
-    //
-    //		fprintf(fSol, "%d %d %d\t\t%.3f %.3f %.3f\n", x, y, theta,
-    //              DISCXY2CONT(x, 0.1), DISCXY2CONT(y, 0.1), DiscTheta2Cont(theta, 16));
-    //	}
+    //write the discrete solution to file
+     for (size_t i = 0; i < solution_stateIDs_V.size(); i++) {
+         int x;
+         int y;
+         int theta;
+         environment_navxythetalat.GetCoordFromState(solution_stateIDs_V[i], x, y, theta);
+    
+         fprintf(fSol, "%d %d %d\n", x, y, theta);
+                 //DISCXY2CONT(x, 0.1), DISCXY2CONT(y, 0.1), DiscTheta2Cont(theta, 16));
+     }
+     fclose(fSol);
 
     // write the continuous solution to file
-    vector<sbpl_xy_theta_pt_t> xythetaPath;
-    environment_navxythetalat.ConvertStateIDPathintoXYThetaPath(&solution_stateIDs_V, &xythetaPath);
-    printf("solution size=%d\n", (unsigned int)xythetaPath.size());
-    for (unsigned int i = 0; i < xythetaPath.size(); i++) {
-        fprintf(fSol, "%.3f %.3f %.3f\n", xythetaPath.at(i).x, xythetaPath.at(i).y, xythetaPath.at(i).theta);
-    }
-    fclose(fSol);
+    // vector<sbpl_xy_theta_pt_t> xythetaPath;
+    // environment_navxythetalat.ConvertStateIDPathintoXYThetaPath(&solution_stateIDs_V, &xythetaPath);
+    // printf("solution size=%d\n", (unsigned int)xythetaPath.size());
+    // for (unsigned int i = 0; i < xythetaPath.size(); i++) {
+    //     fprintf(fSol, "%.3f %.3f %.3f\n", xythetaPath.at(i).x, xythetaPath.at(i).y, xythetaPath.at(i).theta);
+    // }
+    // fclose(fSol);
 
     environment_navxythetalat.PrintTimeStat(stdout);
 
@@ -669,8 +675,8 @@ int planxythetamlevlat(PlannerType plannerType, char* envCfgFilename, char* motP
     pt_m.y = halfwidth;
     perimeterptsVV[0].push_back(pt_m);
 
-    //	perimeterptsV.clear();
-    //	perimeterptsVV[0].clear();
+    //  perimeterptsV.clear();
+    //  perimeterptsVV[0].clear();
 
     //enable the second level
     int numofaddlevels = 1;
@@ -1112,7 +1118,7 @@ int planandnavigatexythetalat(PlannerType plannerType, char* envCfgFilename, cha
     pt_m.y = halfwidth;
     perimeterptsV.push_back(pt_m);
 
-    //	perimeterptsV.clear();
+    //  perimeterptsV.clear();
 
     // initialize true map from the environment file without perimeter or motion primitives
     if (!trueenvironment_navxythetalat.InitializeEnv(envCfgFilename)) {
@@ -1553,6 +1559,143 @@ int planrobarm(PlannerType plannerType, char* envCfgFilename, bool forwardSearch
     return bRet;
 }
 
+int planompl(PlannerType plannerType, char* envCfgFilename, char* motPrimFilename, bool forwardSearch)
+{
+//     int bRet = 0;
+//     double allocated_time_secs = 60.0; // in seconds
+//     double initialEpsilon = 3.0;
+//     MDPConfig MDPCfg;
+//     bool bsearchuntilfirstsolution = false;
+//     bool bforwardsearch = forwardSearch;
+
+//     // set the perimeter of the robot (it is given with 0,0,0 robot ref. point for which planning is done)
+//     vector<sbpl_2Dpt_t> perimeterptsV;
+//     sbpl_2Dpt_t pt_m;
+//     double halfwidth = 1.25; //0.3;
+//     double halflength = 2.5; //0.45;
+//     pt_m.x = -halflength;
+//     pt_m.y = -halfwidth;
+//     perimeterptsV.push_back(pt_m);
+//     pt_m.x = halflength;
+//     pt_m.y = -halfwidth;
+//     perimeterptsV.push_back(pt_m);
+//     pt_m.x = halflength;
+//     pt_m.y = halfwidth;
+//     perimeterptsV.push_back(pt_m);
+//     pt_m.x = -halflength;
+//     pt_m.y = halfwidth;
+//     perimeterptsV.push_back(pt_m);
+
+//     // clear the footprint
+//     //perimeterptsV.clear();
+
+//     // Initialize Environment (should be called before initializing anything else)
+//     EnvironmentOMPL environment_ompl;
+
+//     if (!environment_ompl.InitializeEnv(envCfgFilename, perimeterptsV, motPrimFilename)) {
+//         printf("ERROR: InitializeEnv failed\n");
+//         throw new SBPL_Exception();
+//     }
+
+//     // Initialize MDP Info
+//     if (!environment_ompl.InitializeMDPCfg(&MDPCfg)) {
+//         printf("ERROR: InitializeMDPCfg failed\n");
+//         throw new SBPL_Exception();
+//     }
+
+//     // plan a path
+//     vector<int> solution_stateIDs_V;
+
+//     SBPLPlanner* planner = NULL;
+//     switch (plannerType) {
+//     case PLANNER_TYPE_ARASTAR:
+//         printf("Initializing ARAPlanner...\n");
+//         planner = new ARAPlanner(&environment_ompl, bforwardsearch);
+//         break;
+//     case PLANNER_TYPE_ADSTAR:
+//         printf("Initializing ADPlanner...\n");
+//         planner = new ADPlanner(&environment_ompl, bforwardsearch);
+//         break;
+//     case PLANNER_TYPE_RSTAR:
+//         printf("Invalid configuration: xytheta environment does not support rstar planner...\n");
+//         return 0;
+//     case PLANNER_TYPE_ANASTAR:
+//         printf("Initializing anaPlanner...\n");
+//         planner = new anaPlanner(&environment_ompl, bforwardsearch);
+//         break;
+//     default:
+//         printf("Invalid planner type\n");
+//         break;
+//     }
+
+//     // set planner properties
+//     if (planner->set_start(MDPCfg.startstateid) == 0) {
+//         printf("ERROR: failed to set start state\n");
+//         throw new SBPL_Exception();
+//     }
+//     if (planner->set_goal(MDPCfg.goalstateid) == 0) {
+//         printf("ERROR: failed to set goal state\n");
+//         throw new SBPL_Exception();
+//     }
+//     planner->set_initialsolution_eps(initialEpsilon);
+//     planner->set_search_mode(bsearchuntilfirstsolution);
+
+//     // plan
+//     printf("start planning...\n");
+//     bRet = planner->replan(allocated_time_secs, &solution_stateIDs_V);
+//     printf("done planning\n");
+//     printf("size of solution=%d\n", (unsigned int)solution_stateIDs_V.size());
+
+//     environment_ompl.PrintTimeStat(stdout);
+
+//     // write solution to sol.txt
+//     const char* sol = "sol.txt";
+//     FILE* fSol = fopen(sol, "w");
+//     if (fSol == NULL) {
+//         printf("ERROR: could not open solution file\n");
+//         throw new SBPL_Exception();
+//     }
+
+//     //write the discrete solution to file
+//      for (size_t i = 0; i < solution_stateIDs_V.size(); i++) {
+//          int x;
+//          int y;
+//          int theta;
+//          environment_ompl.GetCoordFromState(solution_stateIDs_V[i], x, y, theta);
+    
+//          fprintf(fSol, "%d %d %d\n", x, y, theta);
+//                  //DISCXY2CONT(x, 0.1), DISCXY2CONT(y, 0.1), DiscTheta2Cont(theta, 16));
+//      }
+//      fclose(fSol);
+
+//     // write the continuous solution to file
+//     // vector<sbpl_xy_theta_pt_t> xythetaPath;
+//     // environment_navxythetalat.ConvertStateIDPathintoXYThetaPath(&solution_stateIDs_V, &xythetaPath);
+//     // printf("solution size=%d\n", (unsigned int)xythetaPath.size());
+//     // for (unsigned int i = 0; i < xythetaPath.size(); i++) {
+//     //     fprintf(fSol, "%.3f %.3f %.3f\n", xythetaPath.at(i).x, xythetaPath.at(i).y, xythetaPath.at(i).theta);
+//     // }
+//     // fclose(fSol);
+
+//     environment_ompl.PrintTimeStat(stdout);
+
+//     // print a path
+//     if (bRet) {
+//         // print the solution
+//         printf("Solution is found\n");
+//     }
+//     else {
+//         printf("Solution does not exist\n");
+//     }
+
+//     fflush(NULL);
+
+//     delete planner;
+
+//     return bRet;
+
+    return 0;
+}
 /*******************************************************************************
  * main - Parse command line arguments and launch one of the sbpl examples above.
  *        Launch sbpl with just the -h option for usage help.
@@ -1561,7 +1704,8 @@ int planrobarm(PlannerType plannerType, char* envCfgFilename, bool forwardSearch
  * @param argv The command-line arguments
  *******************************************************************************/
 int main(int argc, char *argv[])
-{
+{   
+    ros::init(argc, argv, "test_sbpl");
     // Print help
     if (argc == 2 && strcmp(argv[1], "-h") == 0) {
         PrintHelp(argv);
@@ -1637,6 +1781,9 @@ int main(int argc, char *argv[])
     case ENV_TYPE_ROBARM:
         plannerRes = planrobarm(planner, argv[envArgIdx], forwardSearch);
         break;
+    case ENV_TYPE_OMPL:
+        plannerRes = planompl(planner, argv[envArgIdx], motPrimFilename, forwardSearch);
+        break; 
     default:
         printf("Unsupported Environment Type...\n");
         PrintUsage(argv);
