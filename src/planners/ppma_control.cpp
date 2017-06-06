@@ -28,7 +28,7 @@
  */
 #include <sbpl/planners/ppma_control.h>
 
-#include <ompl/base/ProblemDefinition.h>
+#include "/usr/local/include/ompl/base/ProblemDefinition.h"
 
 #include <utility>
 
@@ -219,7 +219,7 @@ void PPMAControlPlanner::getNextLazyElement(PPMAControlState *state) {
 
 void PPMAControlPlanner::insertLazyList(PPMAControlState *state, PPMAControlState *parent,
                                         int edgeCost, bool isTrueCost) {
-    bool print = false; //state->id == 285566 || parent->id == 285566;
+    bool print = true; //state->id == 285566 || parent->id == 285566;
 
     if (print) {
         printf("state->id=%d state->g=%d parent->v=%d edgeCost=%d isTrueCost=%d\n",
@@ -400,10 +400,6 @@ int PPMAControlPlanner::ImprovePath() {
                 for( ; p < pstates.size(); ++p)
                 {
                     /* create a motion */
-                    if (!si_->isValid(pstates[p])) {
-                        break;
-                    }
-
                     ControlMotion *motion = new ControlMotion(si_c_);
                     si_->copyState(motion->state, pstates[p]);//rmotion->state
                     si_c_->copyControl(motion->control, rctrl);
@@ -449,10 +445,10 @@ int PPMAControlPlanner::ImprovePath() {
 
                 int nearest_lattice_state_id = -1;
                 env_->GetNearestLatticeState(nearest_lattice_motion->state, nearest_lattice_state, &nearest_lattice_state_id);
-                //printf("Found nearest lattice state %d!\n", nearest_lattice_state_id);
+                printf("Found nearest lattice state %d!\n", nearest_lattice_state_id);
                 PPMAControlState *lattice_state = GetState(nearest_lattice_state_id);
                 if (lattice_state->id != start_state_id && !lattice_state->expanded_best_parent) {
-                    //printf("The nearest lattice state %d in the tree does not have a valid parent!\n", lattice_state->id);
+                    printf("The nearest lattice state %d in the tree does not have a valid parent!\n", lattice_state->id);
                 }
 
                 // We should not mark this state as 'expanded'.
@@ -938,7 +934,7 @@ void PPMAControlPlanner::setup() {
     base::Planner::setup();
 
     if (!monolithic_tree_) {
-        // monolithic_tree_.reset(tools::SelfConfig::getDefaultNearestNeighbors<ControlMotion *>(this));
+        monolithic_tree_.reset(tools::SelfConfig::getDefaultNearestNeighbors<ControlMotion *>(this));
     }
 
     monolithic_tree_->setDistanceFunction(boost::bind(
@@ -946,7 +942,7 @@ void PPMAControlPlanner::setup() {
             _2));
 
     if (!lattice_tree_) {
-        // lattice_tree_.reset(tools::SelfConfig::getDefaultNearestNeighbors<ControlMotion *>(this));
+        lattice_tree_.reset(tools::SelfConfig::getDefaultNearestNeighbors<ControlMotion *>(this));
     }
 
     lattice_tree_->setDistanceFunction(boost::bind(

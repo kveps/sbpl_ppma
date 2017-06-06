@@ -41,16 +41,16 @@ UNICYCLE_MPRIM_16DEGS = 1;
 
 
 if UNICYCLE_MPRIM_16DEGS == 1
-    resolution = 0.025;
+    resolution = 0.1;
     numberofangles = 16; %preferably a power of 2, definitely multiple of 8
     numberofprimsperangle = 13;
 
     %multipliers (multiplier is used as costmult*cost)
     forwardcostmult = 1;
     backwardcostmult = 1;
-    forwardandturncostmult = 20; % 3;
-    sidestepcostmult = 2;
-    turninplacecostmult = 20;
+    forwardandturncostmult = 1;%20; % 3;
+    sidestepcostmult = 1;%2;
+    turninplacecostmult = 1;%20;
     forwarddiagcostmult = 1; %move forward slightly to the left/right without changing heading
 
     %note, what is shown x,y,theta *changes* (that is, dx,dy,dtheta and not absolute numbers)

@@ -72,9 +72,6 @@ int planxythetalat(char* envCfgFilename, char* motPrimFilename)
     // clear the footprint
     perimeterptsV.clear();
 
-    //set vehicle length
-    setup.setVehicleLength(5);
-
     //Get space information
     ompl::control::SpaceInformationPtr si = setup.getSpaceInformation();
 
@@ -160,8 +157,8 @@ int planxythetalat(char* envCfgFilename, char* motPrimFilename)
     printf("done planning\n");
     printf("size of solution=%d\n", (unsigned int)solution_stateIDs_V.size());
 
-    //visualization_msgs::MarkerArray display_rviz = environment_navxythetalat.seeinRviz();
-    //(environment_navxythetalat.marker_array_pub).publish(display_rviz);
+    visualization_msgs::MarkerArray display_rviz = environment_navxythetalat.seeinRviz();
+    (environment_navxythetalat.marker_array_pub).publish(display_rviz);
 
     environment_navxythetalat.PrintTimeStat(stdout);
 

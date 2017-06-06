@@ -39,6 +39,8 @@
 using namespace std;
 using namespace ompl;
 
+constexpr int kAdditionalEpsilon = 1;
+
 int soln_cost;
 
 // PPMAPlanner::PPMAPlanner(const ompl::base::SpaceInformationPtr &si,
@@ -58,7 +60,7 @@ int soln_cost;
 
 PPMAPlanner::PPMAPlanner(const ompl::base::SpaceInformationPtr &si,
                          EnvironmentPPMA *environment,
-                         bool bSearchForward, double alloc_time, ReplanParams* get_params) : ompl::base::Planner(si, "ppma_planner"),
+                         bool bSearchForward, double alloc_time, PPMAReplanParams* get_params) : ompl::base::Planner(si, "ppma_planner"),
 params(0.0), replan_params(alloc_time), ph_("~") {
     bforwardsearch = bSearchForward;
     env_ = environment;
@@ -69,7 +71,7 @@ params(0.0), replan_params(alloc_time), ph_("~") {
 
     // OMPL Stuff
     InitializeOMPL();
-    
+
     replan_params.initial_eps = get_params->initial_eps;
     replan_params.final_eps = get_params->final_eps;
     replan_params.return_first_solution = get_params->return_first_solution;
@@ -78,16 +80,14 @@ params(0.0), replan_params(alloc_time), ph_("~") {
     totalTime = 0;
     totalPlanTime = 0;
     totalExpands = 0;
-    
+
     results_file = "BenchmarkMaze.txt";
     output.open(results_file.c_str(),ios::out | ios::app);
 
-    ph_.param<std::string>("sbpl_planner_id",sbpl_planner_id_, "Hstar");
+    at_local_minima_ = false;
+    min_heuristic_ = std::numeric_limits<int>::max();
+    conn_lm_prob_ = 0;
 
-    if(!strcmp(sbpl_planner_id_.c_str(), "Hstar"))
-        planner_mode_ = PlannerMode::H_STAR;
-    else
-        planner_mode_ = PlannerMode::wA_STAR;
 }
 
 void PPMAPlanner::InitializeOMPL() {
@@ -210,7 +210,7 @@ void PPMAPlanner::ExpandState(PPMAState *parent) {
         //if(child->h < 0)
         //    continue;
         //else
-            insertLazyList(child, parent, costs[i], isTrueCost[i]);
+        insertLazyList(child, parent, costs[i], isTrueCost[i]);
     }
 }
 
@@ -263,6 +263,7 @@ void PPMAPlanner::getNextLazyElement(PPMAState *state) {
         }
     }
 
+    state->state_type = 1;
     putStateInHeap(state);
 }
 
@@ -318,6 +319,7 @@ void PPMAPlanner::insertLazyList(PPMAState *state, PPMAState *parent,
 
         //this function puts the state into the heap (or updates the position) if we haven't expanded
         //if we have expanded, it will put the state in the incons list (if we haven't already)
+        state->state_type = 1;
         putStateInHeap(state);
     }
 }
@@ -347,10 +349,14 @@ void PPMAPlanner::putStateInHeap(PPMAState *state) {
 
         //printf("Added state %d to heap with gval %d and hval %d\n", state->id, state->g, state->h);
         //env_->PrintState(state->id, true);
-        if (planner_mode_ == PlannerMode::H_STAR || planner_mode_ == PlannerMode::wA_STAR) {
+        if (planner_mode_ == ppma_planner::PlannerMode::H_STAR || planner_mode_ == ppma_planner::PlannerMode::wA_STAR) {
             // Add to the monolithic tree. TODO(venkat): since we add to the tree even
             // for updateheap, we should update the tree as well by deleting the old
             // motion.
+            if(state->state_type == 0) {
+                // ROS_INFO("State cont");
+            }
+            
             AddToMonolithicTree(state);
         }
     }
@@ -374,6 +380,8 @@ int PPMAPlanner::ImprovePath() {
     int expands = 0;
     CKey min_key = heap.getminkeyheap();
 
+    bool sampled_goal_state;
+
     // OMPL Stuff
     Motion *solution  = NULL;
     Motion *approxsol = NULL;
@@ -382,31 +390,32 @@ int PPMAPlanner::ImprovePath() {
     base::State *rstate = rmotion->state;
     base::State *xstate = si_->allocState();
 
+    //local minima 
+    Motion *local_min_motion = new Motion(si_);
+    ompl::base::State *local_min_state = si_->allocState();
+
     int highest_minkey = 0;
 
     bool termination_condition = false;
     bool out_of_time = false;
     while (!termination_condition) {
         //getchar();
-        if (planner_mode_ == PlannerMode::wA_STAR) {
+        if (planner_mode_ == ppma_planner::PlannerMode::wA_STAR) {
 
             out_of_time = outOfTime();
             termination_condition = heap.emptyheap() ||
                                     min_key.key[0] >= INFINITECOST ||
                                     (goal_state->g <= min_key.key[0] && goal_state->isTrueCost) ||
                                     out_of_time;
-        } else if (planner_mode_ == PlannerMode::H_STAR) {
+        } else if (planner_mode_ == ppma_planner::PlannerMode::H_STAR) {
             out_of_time = outOfTime();
-            termination_condition = (goal_state->g <= min_key.key[0] && goal_state->isTrueCost) || out_of_time;
+            termination_condition = (goal_state->g <= kAdditionalEpsilon * min_key.key[0] && goal_state->isTrueCost) || out_of_time;
         }
         if (termination_condition) {
-            //if(!out_of_time){
-		//printf("The min key is %d goal g %d goal h %d\n", min_key.key[0], goal_state->g, goal_state->h);
-	    //}
-	    break;
+    	    break;
         }
 
-        if (planner_mode_ == PlannerMode::H_STAR || planner_mode_ == PlannerMode::wA_STAR) {
+        if (planner_mode_ == ppma_planner::PlannerMode::H_STAR || planner_mode_ == ppma_planner::PlannerMode::wA_STAR) {
             // printf("Minkey is %d\n", min_key.key[0]);
             highest_minkey = std::max(highest_minkey, (int)min_key.key[0]);
 
@@ -433,10 +442,27 @@ int PPMAPlanner::ImprovePath() {
                 if (state->best_parent) {
                     base::State *continuous_state = si_->allocState();
                     env_->GetContState(state->id, continuous_state);
+                    //env_->printContState(continuous_state);
                     base::State *continuous_parent_state = si_->allocState();
                     env_->GetContState(state->best_parent->id, continuous_parent_state);
-                    env_->VisualizeContState(continuous_state, continuous_parent_state, true, false);
+                    //if(expands % 10 == 0)
+                    //    env_->VisualizeContState(continuous_state, continuous_parent_state, true, false);
                 }
+                //printf("Expanded state %d with g %d and h %d\n", state->id, state->g, state->h);
+
+                if(state->h < min_heuristic_)
+                {
+                    at_local_minima_ = false;
+                }
+                else
+                {
+                    //ROS_INFO("Search at a local minima");
+                    at_local_minima_ = true;
+                    env_->GetContState(state->id, local_min_state);
+                    si_->copyState(local_min_motion->state, local_min_state);
+                }
+
+                min_heuristic_ = std::min(min_heuristic_, state->h);
 
                 if (expands % 100000 == 0) {
                     printf("expands so far=%u\n", expands);
@@ -446,44 +472,43 @@ int PPMAPlanner::ImprovePath() {
             }
         }
 
-
-        if (planner_mode_ == PlannerMode::H_STAR || planner_mode_ == PlannerMode::RRT) {
+        if (planner_mode_ == ppma_planner::PlannerMode::H_STAR || planner_mode_ == ppma_planner::PlannerMode::RRT) {
             /* sample random state (with goal biasing) */
             if (goal_s_ && rng_.uniform01() < goalBias_ && goal_s_->canSample()) {
                 goal_s_->sampleGoal(rstate);
+                //env_->printContState(rstate);
+                sampled_goal_state = true;
+                //ROS_INFO("Sampled goal state");
             } else {
                 sampler_->sampleUniform(rstate);
+                sampled_goal_state = false;
+                //ROS_INFO("Sampled non-goal state");
             }
 
             /* find closest state in the tree */
-            Motion *nmotion = monolithic_tree_->nearest(rmotion);
-            base::State *dstate = rstate;
+            Motion *nmotion = new Motion(si_);
+            base::State *dstate = si_->allocState();
+
+            if (at_local_minima_ && ConnectToLocalMinima() && !sampled_goal_state)
+            {
+                nmotion = monolithic_tree_->nearest(local_min_motion);
+                dstate = rstate;
+            }
+            else
+            {
+                nmotion = monolithic_tree_->nearest(rmotion);
+                dstate = rstate;
+            }
 
             /* find state to add */
-            double d = si_->distance(nmotion->state, rstate);
+            double d = si_->distance(nmotion->state, rstate);   
+
 
             if (d > maxDistance_) {
                 si_->getStateSpace()->interpolate(nmotion->state, rstate, maxDistance_ / d,
                                                   xstate);
                 dstate = xstate;
             }
-
-            // double edge_length = si_->distance(nmotion->state, dstate);
-            // int num_segments = static_cast<int>(edge_length / 0.0348);
-            // double interp_factor = 1.0 / static_cast<double>(num_segments);
-            // bool valid = true;
-            // base::State *parstate = nmotion->state;
-            // base::State *interp_state = si_->allocState();
-            // for (double t = 0 ; t <=1; t+=interp_factor) {
-            //    si_->getStateSpace()->interpolate(nmotion->state, dstate, t, interp_state);
-            //    if (!si_->isValid(interp_state)) {
-            //     valid = false;
-            //     break;
-            //    }
-            //    env_->VisualizeContState(interp_state,parstate, false, false);
-            //    parstate = interp_state;
-            // }
-            // si_->freeState(interp_state);
 
             std::pair<base::State*, double> last_valid;
             last_valid.first = si_->allocState();
@@ -502,6 +527,7 @@ int PPMAPlanner::ImprovePath() {
 
                 monolithic_tree_->add(motion);
 
+                //env_->VisualizeContState(nmotion->state,motion->state, true, false);
                 // Goal checking is not necessary for now
                 double dist = 0.0;
                 bool sat = goal_->isSatisfied(motion->state, &dist);
@@ -512,7 +538,7 @@ int PPMAPlanner::ImprovePath() {
                     approxdif = dist;
                     solution = motion;
                     //ROS_INFO("RRT found goal!");
-                    if (planner_mode_ == PlannerMode::RRT) {
+                    if (planner_mode_ == ppma_planner::PlannerMode::RRT) {
                         lastGoalMotion_ = motion;
                         termination_condition = true;
                     }
@@ -527,7 +553,7 @@ int PPMAPlanner::ImprovePath() {
                 // Now add the closest lattice state to the search frontier after
                 // computing the appropriate motion cost.
 
-                if (planner_mode_ == PlannerMode::H_STAR) {
+                if (planner_mode_ == ppma_planner::PlannerMode::H_STAR) {
                     int nearest_lattice_state_id = -1;
                     base::State *nearest_lattice_state = si_->allocState();
                     env_->GetNearestLatticeState(motion->state, nearest_lattice_state,
@@ -548,16 +574,11 @@ int PPMAPlanner::ImprovePath() {
                     std::pair<base::State*, double> last_valid_st;
                     last_valid_st.first = si_->allocState();
 
-                    // printf("Printing Motion state................................\n");
-                    // for(int i = 0; i < 7; i++)
-                    //     printf("Motion state angle is %f\n", motion->state->as<ompl::base::RealVectorStateSpace::StateType>()->values[i]);
-                    // printf("Printing Nearest Lattice state................................\n");
-                    // for(int i = 0; i < 7; i++)
-                    //     printf("Nearest lattice state angle is %f\n", nearest_lattice_state->as<ompl::base::RealVectorStateSpace::StateType>()->values[i]);
-                    
                     if (si_->checkMotion(motion->state, nearest_lattice_state, last_valid_st)) {
 
-                        env_->VisualizeContState(nearest_lattice_state,motion->state, false, false);
+
+                        //env_->VisualizeContState(motion->state,nmotion->state, false, false);
+                        //env_->VisualizeContState(nearest_lattice_state,motion->state, false, false);
 
                         int total_edge_cost = tree_edge_cost + snapping_cost;
                         //printf("the total edge cost is %d\n", total_edge_cost);
@@ -571,17 +592,17 @@ int PPMAPlanner::ImprovePath() {
                         //PPMAState *cont_parent = GetState(cont_parent_id);
                         cont_child->g = snap_motion->g;
                         cont_child->isTrueCost = true;
+                        cont_child->state_type = 0;
                         putStateInHeap(cont_child);
+                        //printf("Adding sample to heap!:g-val: %d h-val: %d min_key: %d\n", cont_child->g, cont_child->h, min_key.key[0]);
+                        //getchar();
 
                         if (nearest_lattice_state_id == goal_state_id) {
                             lastGoalMotion_ = snap_motion;
-                            //ROS_INFO("Goal found from snap motion");
                         }
 
-                        //printf("Adding to heap!:g-val: %d h-val: %d min_key: %d\n", cont_child->g, cont_child->h, min_key.key[0]);
-
-
                     }
+
                 }
                 si_->freeState(last_valid.first);
             }
@@ -589,6 +610,7 @@ int PPMAPlanner::ImprovePath() {
             //get the min key for the next iteration
         }
         min_key = heap.getminkeyheap();
+
         //printf("min_key =%d\n",min_key.key[0]);
     }
 
@@ -598,7 +620,7 @@ int PPMAPlanner::ImprovePath() {
         return 2;
     }
 
-    if (planner_mode_ == PlannerMode::wA_STAR) {
+    if (planner_mode_ == ppma_planner::PlannerMode::wA_STAR) {
         if (goal_state->g == INFINITECOST && (heap.emptyheap() ||
                                               min_key.key[0] >= INFINITECOST)) {
             return 0;  //solution does not exists
@@ -614,7 +636,7 @@ int PPMAPlanner::ImprovePath() {
 
     bool solved = false;
     bool approximate = false;
-    if (lastGoalMotion_ == NULL && planner_mode_ != PlannerMode::wA_STAR) {
+    if (lastGoalMotion_ == NULL && planner_mode_ != ppma_planner::PlannerMode::wA_STAR) {
         lastGoalMotion_ = approxsol;
         approximate = true;
         //printf("Just an approximate solution.......\n");
@@ -622,42 +644,55 @@ int PPMAPlanner::ImprovePath() {
 
     if (lastGoalMotion_ != NULL) {
         // lastGoalMotion_ = solution;
-        std::vector<double> soln_angles(7, 0);
-        for(int i = 0; i < 7; i++)
-        {
-            soln_angles[i] = lastGoalMotion_->state->as<ompl::base::RealVectorStateSpace::StateType>()->values[i];
-        }
-        //env_->printContState(soln_angles);
 
         solution = lastGoalMotion_;
 
         /* construct the solution path */
         std::vector<Motion *> mpath;
-
         while (solution != NULL) {
+            //ROS_INFO("Printing soln states");
+            //env_->printContState(solution->state);
             mpath.push_back(solution);
             solution = solution->parent;
         }
 
         /* set the solution path */
         ompl::geometric::PathGeometric *path = new ompl::geometric::PathGeometric(si_);
-
+                    int num = 0;
         //printf("Path g-vals");
+
+        // -------------  Visualization -----------------------------------------------------------
+
         for (int i = mpath.size() - 1 ; i >= 0 ; --i) {
 
             path->append(mpath[i]->state);
             auto se2_state = mpath[i]->state->as<ompl::base::SE2StateSpace::StateType>();
-            if(i != 0)
-                env_->VisualizeContState(mpath[i]->state,mpath[i-1]->state, false, true);
-            else
-                env_->VisualizeContState(mpath[i]->state,mpath[i]->state, false, true);
+            //if(i != 0)
+            // ROS_INFO("state type is %d", mpath[i]->state_type );
+            if(mpath[i]->state_type != 1) mpath[i]->state_type = 0;
+            if(mpath[i]->state_type == 1)
+            {   
+                if(num % 10 == 0) {
+                    env_->VisualizeContState(mpath[i]->state,mpath[i]->state, mpath[i]->state_type, false);
+                }
+                num++;
+            }else {
+                env_->VisualizeContState(mpath[i]->state,mpath[i]->state, mpath[i]->state_type, false);
+            }
+
+             usleep(5000);
         }
+
+        // -------------------------------------------------------------------------------
+
+
         pdef_->clearSolutionPaths();
         pdef_->addSolutionPath(base::PathPtr(path), approximate, approxdif);
         //path->print(std::cout);
+        // getchar();
         solved = true;
         ompl::base::Cost path_cost = path->cost(pdef_->getOptimizationObjective());
-        soln_cost = (int)(1000*path_cost.value());
+        soln_cost = (int)(path_cost.value());
         printf("SOLVED!!! Path has %zu waypoints with solution cost as %d\n", mpath.size(), soln_cost);
     }
 
@@ -673,6 +708,11 @@ int PPMAPlanner::ImprovePath() {
     // return base::PlannerStatus(solved, approximate);
 
     return 1;
+}
+
+//Connect to local minima with some probability
+bool PPMAPlanner::ConnectToLocalMinima(){
+    return (rand() % 100) <  conn_lm_prob_;
 }
 
 vector<int> PPMAPlanner::GetSearchPath(int &solcost) {
@@ -800,6 +840,7 @@ void PPMAPlanner::initializeSearch() {
     //call get state to initialize the start and goal states
     goal_state = GetState(goal_state_id);
     start_state = GetState(start_state_id);
+
     //put start state in the heap
     start_state->g = 0;
     CKey key;
@@ -852,17 +893,18 @@ bool PPMAPlanner::Search(vector<int> &pathIds, int &PathCost) {
 
         //run weighted A*
         
-        chrono::time_point<chrono::steady_clock> start, end;
-        start = chrono::steady_clock::now();
+        chrono::time_point<chrono::monotonic_clock> start, end;
+        start = chrono::monotonic_clock::now();
+
         int before_expands = search_expands;
-        
+        clock_t before_time = clock();
         //ImprovePath returns:
         //1 if the solution is found
         //0 if the solution does not exist
         //2 if it ran out of time
         int ret = ImprovePath();
 
-        end = chrono::steady_clock::now();
+        end = chrono::monotonic_clock::now();
 
         if (ret == 1) { //solution found for this iteration
             eps_satisfied = eps;
@@ -870,8 +912,8 @@ bool PPMAPlanner::Search(vector<int> &pathIds, int &PathCost) {
 
         int delta_expands = search_expands - before_expands;
         chrono::duration<double> elapsed_seconds = end-start;
-        //double delta_time = double(clock() - before_time) / CLOCKS_PER_SEC;
-        double delta_time = elapsed_seconds.count();
+        double delta_time = double(clock() - before_time) / CLOCKS_PER_SEC;
+        //double delta_time = elapsed_seconds.count();
 
         //print the bound, expands, and time for that iteration
         printf("bound=%f expands=%d cost=%d time=%.3f\n",
@@ -902,7 +944,7 @@ bool PPMAPlanner::Search(vector<int> &pathIds, int &PathCost) {
         prepareNextSearchIteration();
     }
 
-    if (planner_mode_ == PlannerMode::wA_STAR || planner_mode_ == PlannerMode::H_STAR) {
+    if (planner_mode_ == ppma_planner::PlannerMode::wA_STAR || planner_mode_ == ppma_planner::PlannerMode::H_STAR) {
         if (goal_state->g == INFINITECOST) {
             totalTime = totalPlanTime;
             printf("wA*/H* could not find a solution (ran out of time)\n");
@@ -921,7 +963,7 @@ bool PPMAPlanner::Search(vector<int> &pathIds, int &PathCost) {
 
     printf("solution found\n");
 
-    // if (planner_mode_ == PlannerMode::wA_STAR) {
+    // if (planner_mode_ == ppma_planner::PlannerMode::wA_STAR) {
     //     clock_t before_reconstruct = clock();
     //     pathIds = GetSearchPath(PathCost);
     //     reconstructTime = double(clock() - before_reconstruct) / CLOCKS_PER_SEC;
@@ -968,21 +1010,20 @@ void PPMAPlanner::interrupt() {
     interruptFlag = true;
 }
 
-int PPMAPlanner::replan(vector<int> *solution_stateIDs_V, ReplanParams p, double &totalT) {
+int PPMAPlanner::replan(vector<int> *solution_stateIDs_V, PPMAReplanParams p, double &totalT) {
     int solcost;
     return replan(solution_stateIDs_V, p, &solcost, totalT);
 }
 
 int PPMAPlanner::replan(int start, int goal, vector<int> *solution_stateIDs_V,
-                        ReplanParams p, int *solcost, double &totalT) {
+                        PPMAReplanParams p, int *solcost, double &totalT) {
     set_start(start);
     set_goal(goal);
     return replan(solution_stateIDs_V, p, solcost, totalT);
 }
 
-int PPMAPlanner::replan(vector<int> *solution_stateIDs_V, ReplanParams p,
+int PPMAPlanner::replan(vector<int> *solution_stateIDs_V, PPMAReplanParams p,
                         int *solcost, double &totalT) {
-    printf("planner: replan called\n");
     params = p;
     use_repair_time = replan_params.repair_time >= 0;
     interruptFlag = false;
@@ -997,6 +1038,16 @@ int PPMAPlanner::replan(vector<int> *solution_stateIDs_V, ReplanParams p,
         printf("ERROR searching: no start state set\n");
         return 0;
     }
+
+    //plannerMode
+    planner_mode_ = p.planner_mode;
+
+    if(planner_mode_ == ppma_planner::PlannerMode::H_STAR)
+        ROS_INFO("Replan Called with Hstar");
+    else if(planner_mode_ == ppma_planner::PlannerMode::wA_STAR)
+        ROS_INFO("Replan Called with WAstar");
+    else
+        ROS_INFO("Replan Called with RRT");
 
     //plan
     vector<int> pathIds;
@@ -1278,6 +1329,8 @@ void PPMAPlanner::AddToMonolithicTree(PPMAState *state) {
     //printf("The tree edge cost form addtomonolithic tree is %d\n", tree_edge_cost);
     motion->g = tree_edge_cost + nearest_motion->g;
     //printf("Child g is %d\n", motion->g);
+    //parent_motion->state_type = state->best_parent->state_type;
+    motion->state_type = state->state_type;
 
     monolithic_tree_->add(motion);
     //env_->VisualizeContState(motion->state,nearest_motion->state);
@@ -1299,3 +1352,24 @@ void PPMAPlanner::get_search_stats(vector<PlannerStats> *s) {
     }
 }
 
+bool PPMAPlanner::check_motion(ompl::base::State* nstate, ompl::base::State* dstate, std::pair<ompl::base::State*, double> last_valid)
+{
+
+  double interp_size;
+
+  if( (!si_->isValid(nstate)) || (!si_->isValid(dstate)))
+    return false;
+
+  bool w_interpolate = env_->wInterpolate(nstate, dstate, interp_size);
+
+  if (!w_interpolate) {
+  
+    return env_->jInterpolate(nstate, dstate, interp_size);
+  
+  }
+  else{
+  
+    return w_interpolate;
+  }
+
+}

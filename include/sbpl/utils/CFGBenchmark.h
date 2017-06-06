@@ -34,8 +34,8 @@
 
 /* Author: Ioan Sucan, Mark Moll */
 
-#include <ompl/control/planners/syclop/Decomposition.h>
-#include <ompl/tools/benchmark/Benchmark.h>
+#include "/usr/local/include/ompl/control/planners/syclop/Decomposition.h"
+#include "/usr/local/include/ompl/tools/benchmark/Benchmark.h"
 #include "BenchmarkOptions.h"
 
 class CFGBenchmark

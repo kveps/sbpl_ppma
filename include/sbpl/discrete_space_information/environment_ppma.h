@@ -32,8 +32,8 @@
 
 #include <sbpl/discrete_space_information/environment.h>
 #include <sbpl/utils/utils.h>
-#include <ompl/base/State.h>     
-#include <ompl/base/ScopedState.h>     
+#include "/usr/local/include/ompl/base/State.h"     
+#include "/usr/local/include/ompl/base/ScopedState.h"     
 
 class EnvironmentPPMA : public DiscreteSpaceInformation
 {
@@ -82,6 +82,12 @@ class EnvironmentPPMA : public DiscreteSpaceInformation
     }
 
     virtual int GetContEdgeCost(const ompl::base::State *parent_state, const ompl::base::State *child_state) = 0;
+
+    virtual void printContState(const ompl::base::State* state) = 0;
+
+    virtual bool wInterpolate(ompl::base::State* nstate, ompl::base::State* dstate, double &interp_size) = 0;
+    
+    virtual bool jInterpolate(ompl::base::State* nstate, ompl::base::State* dstate, double &interp_size) = 0;
 
     /**
      * \brief GetSuccs methods that inform the environment which queue the states are being expanded from

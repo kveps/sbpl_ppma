@@ -114,7 +114,7 @@ int planxythetalat(char* envCfgFilename, char* eps, char* motPrimFilename)
     std::string env_fname = environment_navxythetalat.env_path + env_cfg->env_name;    
     setup.setEnvironmentMesh(env_fname.c_str());
 
-    setup.setOptimizationObjectiveAndThreshold("length", std::numeric_limits<double>::max()); 
+    //setup.setOptimizationObjectiveAndThreshold("length", std::numeric_limits<double>::max()); 
 
     si->setStateValidityCheckingResolution(0.01);
 
@@ -159,8 +159,7 @@ int planxythetalat(char* envCfgFilename, char* eps, char* motPrimFilename)
 
     // plan
     printf("start planning...\n");
-    double totalTime;
-    bRet = planner->replan(&(planner->solution_stateIDs_V),planner->replan_params, totalTime);
+    bRet = planner->replan(&(planner->solution_stateIDs_V),planner->replan_params);
     printf("done planning\n");
     printf("size of solution=%d\n", (unsigned int)solution_stateIDs_V.size());
 

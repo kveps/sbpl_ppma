@@ -64,7 +64,6 @@
 #include <sbpl/planners/lazyARA.h>
 #include <sbpl/planners/mha_planner.h>
 #include <sbpl/planners/ppma.h>
- #include <sbpl/planners/ppma_control.h>
 #include <sbpl/utils/2Dgridsearch.h>
 #include <sbpl/utils/heap.h>
 #include <sbpl/utils/list.h>
@@ -75,7 +74,6 @@
 #include <sbpl/utils/sbpl_bfs_2d.h>
 #include <sbpl/utils/sbpl_bfs_3d.h>
 #include <sbpl/utils/utils.h>
-#include <sbpl/utils/BenchmarkTypes.h>
 
 #endif
 

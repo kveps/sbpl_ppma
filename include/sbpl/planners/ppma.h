@@ -32,7 +32,6 @@
 #include "../../sbpl/headers.h"
 #include <sbpl/discrete_space_information/environment_ppma.h>
 
-
 #include "/usr/local/include/ompl/base/Planner.h"
 // often useful headers:
 #include "/usr/local/include/ompl/util/RandomNumbers.h"
@@ -45,14 +44,30 @@
 #include "/usr/local/include/ompl/geometric/PathGeometric.h"
 #include "/usr/local/include/ompl/base/ProblemDefinition.h"
 
+#include "/home/karthik/fbp/src/monolithic_pr2_planner/monolithic_pr2_planner/include/monolithic_pr2_planner/StateReps/RealVectorWeightedStateSpace.h"
+
 #include <queue>
 
 class PPMALazyListElement;
 
-enum class PlannerMode {
-  H_STAR = 0,
-  wA_STAR,
-  RRT
+namespace ppma_planner
+{
+  enum class PlannerMode {
+    H_STAR = 7,//starting with 2 to accomodate MHA planners for 0 and 1
+    wA_STAR,
+    RRT
+  };
+}
+
+class PPMAReplanParams: public ReplanParams
+{
+  public:
+    PPMAReplanParams(double allocated_time): ReplanParams(allocated_time)
+  {
+    planner_mode = ppma_planner::PlannerMode::H_STAR;
+  };
+
+  ppma_planner::PlannerMode planner_mode;
 };
 
 class PPMAState: public AbstractSearchState {
@@ -68,6 +83,7 @@ class PPMAState: public AbstractSearchState {
   bool in_incons;
   std::priority_queue<PPMALazyListElement> lazyList;
   bool isTrueCost;
+  int state_type;
 };
 
 
@@ -89,26 +105,26 @@ class PPMALazyListElement {
 class PPMAPlanner : public SBPLPlanner, public ompl::base::Planner {
 
  public:
-   PlannerMode planner_mode_;
+   ppma_planner::PlannerMode planner_mode_;
   
-  ReplanParams replan_params;
+  PPMAReplanParams replan_params;
   std::vector<int> solution_stateIDs_V;
   
   virtual int replan(double allocated_time_secs,
                      std::vector<int> *solution_stateIDs_V) {
-    printf("Not supported. Use ReplanParams");
+    printf("Not supported. Use PPMAReplanParams");
     return -1;
   };
   virtual int replan(double allocated_time_sec,
                      std::vector<int> *solution_stateIDs_V, int *solcost) {
-    printf("Not supported. Use ReplanParams");
+    printf("Not supported. Use PPMAReplanParams");
     return -1;
   };
 
   virtual int replan(int start, int goal, std::vector<int> *solution_stateIDs_V,
-                     ReplanParams params, int *solcost, double &totalT);
-  virtual int replan(std::vector<int> *solution_stateIDs_V, ReplanParams params, double &totalT);
-  virtual int replan(std::vector<int> *solution_stateIDs_V, ReplanParams params,
+                     PPMAReplanParams params, int *solcost, double &totalT);
+  virtual int replan(std::vector<int> *solution_stateIDs_V, PPMAReplanParams params, double &totalT);
+  virtual int replan(std::vector<int> *solution_stateIDs_V, PPMAReplanParams params,
                      int *solcost, double &totalT);
 
   void interrupt();
@@ -131,16 +147,16 @@ class PPMAPlanner : public SBPLPlanner, public ompl::base::Planner {
   };
 
   virtual int set_search_mode(bool bSearchUntilFirstSolution) {
-    printf("Not supported. Use ReplanParams");
+    printf("Not supported. Use PPMAReplanParams\n");
     return -1;
   };
 
   virtual void set_initialsolution_eps(double initialsolution_eps) {
-    printf("Not supported. Use ReplanParams");
+    printf("Not supported. Use PPMAReplanParams\n");
   };
 
   PPMAPlanner(const ompl::base::SpaceInformationPtr &si,
-               EnvironmentPPMA *environment, bool bforwardsearch, double alloc_time, ReplanParams* get_params);
+               EnvironmentPPMA *environment, bool bforwardsearch, double alloc_time, PPMAReplanParams* get_params);
   ~PPMAPlanner();
 
   virtual void get_search_stats(std::vector<PlannerStats> *s);
@@ -174,6 +190,10 @@ class PPMAPlanner : public SBPLPlanner, public ompl::base::Planner {
 
   void setpdefstartgoal(std::vector<double> start, std::vector<double> goal);
 
+  bool check_motion(ompl::base::State* nstate, ompl::base::State* dstate, std::pair<ompl::base::State*, double> last_valid);
+
+  bool ConnectToLocalMinima();
+
   std::ofstream output;
   std::string results_file;
 
@@ -187,7 +207,7 @@ class PPMAPlanner : public SBPLPlanner, public ompl::base::Planner {
   EnvironmentPPMA* env_;
 
   //params
-  ReplanParams params;
+  PPMAReplanParams params;
   bool bforwardsearch; //if true, then search proceeds forward, otherwise backward
   PPMAState *goal_state;
   PPMAState *start_state;
@@ -232,6 +252,11 @@ class PPMAPlanner : public SBPLPlanner, public ompl::base::Planner {
   virtual void prepareNextSearchIteration();
   virtual bool Search(std::vector<int> &pathIds, int &PathCost);
 
+  //Connect-to-localminima
+  bool at_local_minima_;
+  int min_heuristic_;
+  int conn_lm_prob_;
+
   //OMPL Stuff
   class Motion {
    public:
@@ -245,11 +270,28 @@ class PPMAPlanner : public SBPLPlanner, public ompl::base::Planner {
     ompl::base::State *state;
     Motion *parent;
     int g;
+    int state_type;
     bool lattice_state;
   };
   void freeMemory();
   double distanceFunction(const Motion *a, const Motion *b) const {
-    return si_->distance(a->state, b->state);
+    //return si_->distance(a->state, b->state);
+    ompl::base::State* state_a = a->state;
+    ompl::base::State* state_b = b->state;
+
+    // const ompl::base::CompoundState* sa = dynamic_cast<const ompl::base::CompoundState*> (state_a);
+    // const ompl::base::CompoundState* sb = dynamic_cast<const ompl::base::CompoundState*> (state_b);
+    
+    // return sqrt( pow((sa->as<ompl::base::SE2StateSpace::StateType>(1)->getX() - sb->as<ompl::base::SE2StateSpace::StateType>(1)->getX()),2) + 
+    //              pow((sa->as<ompl::base::SE2StateSpace::StateType>(1)->getY() - sb->as<ompl::base::SE2StateSpace::StateType>(1)->getY()),2) +
+    //              pow((sa->as<ompl::base::SE2StateSpace::StateType>(1)->getYaw() - sb->as<ompl::base::SE2StateSpace::StateType>(1)->getYaw()),2) );
+  
+    const ompl::base::RealVectorWeightedStateSpace::StateType* sa = state_a->as<ompl::base::RealVectorWeightedStateSpace::StateType>();
+    const ompl::base::RealVectorWeightedStateSpace::StateType* sb = state_b->as<ompl::base::RealVectorWeightedStateSpace::StateType>();
+
+    return sqrt( pow((sa->values[9] - sb->values[9]),2) + 
+                 pow((sa->values[10] - sb->values[10]),2) +
+                 pow((sa->values[11] - sb->values[11]),2) );
   }
 
   // Add the edge between state->parent to state to the monolithic tree. This

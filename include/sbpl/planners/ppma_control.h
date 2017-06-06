@@ -33,11 +33,11 @@
 #include <sbpl/discrete_space_information/environment_ppma.h>
 
 // often useful headers:
-#include <ompl/util/RandomNumbers.h>
-#include <ompl/tools/config/SelfConfig.h>
-#include "ompl/datastructures/NearestNeighbors.h"
-#include "ompl/control/planners/PlannerIncludes.h"
-#include <ompl/base/goals/GoalSampleableRegion.h>
+#include "/usr/local/include/ompl/util/RandomNumbers.h"
+#include "/usr/local/include/ompl/tools/config/SelfConfig.h"
+#include "/usr/local/include/ompl/datastructures/NearestNeighbors.h"
+#include "/usr/local/include/ompl/control/planners/PlannerIncludes.h"
+#include "/usr/local/include/ompl/base/goals/GoalSampleableRegion.h"
 
 #include <queue>
 

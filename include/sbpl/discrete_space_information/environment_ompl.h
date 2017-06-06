@@ -43,12 +43,13 @@
 #include <string>
 #include <map>
 
-#include <ompl/tools/benchmark/Benchmark.h>
-#include <ompl/control/planners/rrt/RRT.h>
-#include <ompl/control/planners/kpiece/KPIECE1.h>
+#include "/usr/local/include/ompl/tools/benchmark/Benchmark.h"
+#include "/usr/local/include/ompl/control/planners/rrt/RRT.h"
+#include "/usr/local/include/ompl/control/planners/kpiece/KPIECE1.h"
 #include <omplapp/apps/KinematicCarPlanning.h>
 #include <omplapp/apps/SE2RigidBodyPlanning.h>
 #include <omplapp/config.h>
+#include "/usr/local/include/ompl/base/OptimizationObjective.h"
 #include <boost/math/constants/constants.hpp>
 
 #include <ros/ros.h>
@@ -576,10 +577,8 @@ protected:
     ros::Publisher env_pub;
     ros::Publisher rob_start_pub;
     ros::Publisher rob_goal_pub;
-    ros::Publisher tree_pub;
     bool use_visualization_;
 
-    visualization_msgs::MarkerArray ma_setup;
     visualization_msgs::MarkerArray ma;
 
     int cont_hash_counter;
@@ -771,6 +770,7 @@ public:
     virtual bool checkMotion (const ompl::base::State *s1, const ompl::base::State *s2, std::pair< ompl::base::State *, double > &lastValid) const;
 
 };
+
 
 class ConfigFile
 {

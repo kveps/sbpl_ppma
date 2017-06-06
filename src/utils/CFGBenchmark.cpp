@@ -57,7 +57,6 @@
 #include <ompl/geometric/planners/stride/STRIDE.h>
 #include <ompl/geometric/planners/pdst/PDST.h>
 #include <ompl/geometric/planners/fmt/FMT.h>
-#include <ompl/geometric/planners/bitstar/BITstar.h>
 #include <ompl/geometric/planners/AnytimePathShortening.h>
 #include <ompl/geometric/planners/cforest/CForest.h>
 
@@ -161,8 +160,6 @@ ompl::base::PlannerPtr CFGBenchmark::allocPlanner(const ompl::base::SpaceInforma
             p = new ompl::geometric::PDST(si);
         else if (name == "fmt")
             p = new ompl::geometric::FMT(si);
-        else if (name == "bitstar")
-            p = new ompl::geometric::BITstar(si);
         else if (name == "aps")
             p = new ompl::geometric::AnytimePathShortening(si);
         else if (name == "cforest")
@@ -400,13 +397,10 @@ void CFGBenchmark::runBenchmark(void)
     req.displayProgress = true;
     req.saveConsoleOutput = false;
     req.useThreads = true;
-    //req.simplify = false;
+    req.simplify = false;
     benchmark_->benchmark(req);
 
-    std::string env_name = bo_.declared_options_["problem.world"];
-    env_name.erase(env_name.end()-4, env_name.end());
-    std::string prebase = "../benchmark_results/SE2benchmark/" + env_name + "/"; 
-    std::string base_name = prebase + "trial";
+    std::string base_name = "../benchmark_results/SE2benchmark/trial";
     std::string log_ext = ".log";
     std::string db_ext = ".db";
     std::string pdf_ext = ".pdf";

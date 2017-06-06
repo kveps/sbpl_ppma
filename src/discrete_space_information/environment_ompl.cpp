@@ -36,8 +36,9 @@
 #include <sbpl/utils/mdp.h>
 #include <sbpl/utils/mdpconfig.h>
 
-#include <ompl/base/spaces/SE2StateSpace.h>
-#include <ompl/base/OptimizationObjective.h>
+#include "/usr/local/include/ompl/base/spaces/SE2StateSpace.h"
+#include "/usr/local/include/ompl/base/OptimizationObjective.h"
+#include "/usr/local/include/ompl/base/Cost.h"
 
 #include <angles/angles.h>
 
@@ -100,7 +101,6 @@ EnvironmentOMPLTICE::EnvironmentOMPLTICE(const ompl::base::SpaceInformationPtr &
     rob_start_pub = nh.advertise<visualization_msgs::Marker>("rob_s_marker", 1000);
     rob_goal_pub = nh.advertise<visualization_msgs::Marker>("rob_g_marker", 1000);
     marker_array_pub = nh.advertise<visualization_msgs::MarkerArray>("marker_array", 1000);
-    tree_pub = nh.advertise<visualization_msgs::Marker>("tree_marker", 1000);
 
     //Environment Path
     env_path = "../env_examples/ompl/Maze_planar/";
@@ -112,9 +112,9 @@ EnvironmentOMPLTICE::EnvironmentOMPLTICE(const ompl::base::SpaceInformationPtr &
 
     //Get space information
     si_ = si;
-    
+
     ros::NodeHandle private_nh("~");
-    private_nh.param("visualize_h_star", use_visualization_, true);
+    private_nh.param("visualize_h_star", use_visualization_, false);
 }
 
 EnvironmentOMPLTICE::~EnvironmentOMPLTICE()
@@ -223,8 +223,6 @@ void EnvironmentOMPLTICE::publish_env_rob(){
   rob_goal.lifetime = ros::Duration();
   rob_goal.mesh_resource = file_cont + package_path + EnvOMPLCfg.robot_name;
   ma.markers.push_back(rob_goal);
-
-  //marker_array_pub.publish(ma);
 }
 
 //-------------------problem specific and local functions---------------------
@@ -2653,14 +2651,12 @@ void EnvironmentOMPL::stateToVisualizationMarker(std::vector<double> coord, bool
   line_strip.id = rand();
   line_strip.scale.x = 0.1;
   line_strip.header.frame_id = "map";
-  line_strip.lifetime = ros::Duration();
 
   visualization_msgs::Marker path_strip;
   path_strip.type = visualization_msgs::Marker::LINE_STRIP;
   path_strip.id = rand();
   path_strip.scale.x = 0.5;
   path_strip.header.frame_id = "map";
-  path_strip.lifetime = ros::Duration();
 
   if (is_discrete_state && !is_path){
   state.color.r = 1.0f;
@@ -2684,13 +2680,12 @@ void EnvironmentOMPL::stateToVisualizationMarker(std::vector<double> coord, bool
 
   line_strip.color.r = 1.0f;
   line_strip.color.a = 1.0;
-  //ma.markers.push_back(line_strip);
-  tree_pub.publish(line_strip);  
+  ma.markers.push_back(line_strip);
   } 
   else if (!is_discrete_state && !is_path){
   state.color.r = 0.0f;
   state.color.g = 1.0f;
-  state.color.b = 0.0f;
+  state.    color.b = 0.0f;
   state.color.a = 1.0;
 
   state.pose.position.z = 5;
@@ -2709,8 +2704,7 @@ void EnvironmentOMPL::stateToVisualizationMarker(std::vector<double> coord, bool
 
   line_strip.color.g = 1.0f;
   line_strip.color.a = 1.0;
-  //ma.markers.push_back(line_strip);
-  tree_pub.publish(line_strip);
+  ma.markers.push_back(line_strip);
   }
   else{
   state.color.r = 0.0f;
@@ -2739,10 +2733,8 @@ void EnvironmentOMPL::stateToVisualizationMarker(std::vector<double> coord, bool
   }
   state.lifetime = ros::Duration();
 
-  //ma.markers.push_back(state);
-  tree_pub.publish(state);
-  marker_array_pub.publish(ma);
-  ros::Duration(0.1).sleep();
+  ma.markers.push_back(state);
+  //return ma;
 }
 
 void EnvironmentOMPL::GetPreds(int TargetStateID, vector<int>* PredIDV, vector<int>* CostV)
@@ -3382,6 +3374,7 @@ int EnvironmentOMPL::GetContEdgeCost(const ompl::base::State *parent_state, cons
   // benchmarks. Also, GetActionCost should call this method to compute the cost
   // of an edge.
   // printf("Hi..................................\n");fflush(stdout);
+  //const auto &objective = *cost_obj;
   ompl::base::Cost contEdgeCost = cost_obj->motionCost(parent_state, child_state);
   double x = parent_state->as<ompl::base::SE2StateSpace::StateType>()->getX();
   double y = parent_state->as<ompl::base::SE2StateSpace::StateType>()->getY();
@@ -3393,7 +3386,7 @@ int EnvironmentOMPL::GetContEdgeCost(const ompl::base::State *parent_state, cons
   theta = child_state->as<ompl::base::SE2StateSpace::StateType>()->getYaw();
   //printf("The x,y and theta of child state is %f,%f and %f\n",x,y,theta);
 
-  int int_contEdgeCost = (int)(OMPL_COSTMULT_MTOMM*contEdgeCost.value()); 
+  int int_contEdgeCost = (int)(OMPL_COSTMULT_MTOMM*(contEdgeCost.value()) ); 
 
   // /printf("The edgecost is %d\n",int_contEdgeCost);
 
