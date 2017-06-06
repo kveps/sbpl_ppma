@@ -29,22 +29,20 @@
 #ifndef _PPMA_PLANNER_H_
 #define _PPMA_PLANNER_H_
 
-#include "../../sbpl/headers.h"
+#include <sbpl/headers.h>
 #include <sbpl/discrete_space_information/environment_ppma.h>
 
-#include "/usr/local/include/ompl/base/Planner.h"
+#include <ompl/base/Planner.h>
 // often useful headers:
-#include "/usr/local/include/ompl/util/RandomNumbers.h"
-#include "/usr/local/include/ompl/tools/config/SelfConfig.h"
-#include "/usr/local/include/ompl/geometric/planners/PlannerIncludes.h"
-#include "/usr/local/include/ompl/datastructures/NearestNeighbors.h"
-#include "/usr/local/include/ompl/base/goals/GoalSampleableRegion.h"
-#include "/usr/local/include/ompl/base/Cost.h"
-#include "/usr/local/include/ompl/control/planners/rrt/RRT.h"
-#include "/usr/local/include/ompl/geometric/PathGeometric.h"
-#include "/usr/local/include/ompl/base/ProblemDefinition.h"
-
-#include "/home/karthik/fbp/src/monolithic_pr2_planner/monolithic_pr2_planner/include/monolithic_pr2_planner/StateReps/RealVectorWeightedStateSpace.h"
+#include <ompl/util/RandomNumbers.h>
+#include <ompl/tools/config/SelfConfig.h>
+#include <ompl/geometric/planners/PlannerIncludes.h>
+#include <ompl/datastructures/NearestNeighbors.h>
+#include <ompl/base/goals/GoalSampleableRegion.h>
+#include <ompl/base/Cost.h>
+#include <ompl/control/planners/rrt/RRT.h>
+#include <ompl/geometric/PathGeometric.h>
+#include <ompl/base/ProblemDefinition.h>
 
 #include <queue>
 
@@ -275,23 +273,22 @@ class PPMAPlanner : public SBPLPlanner, public ompl::base::Planner {
   };
   void freeMemory();
   double distanceFunction(const Motion *a, const Motion *b) const {
-    //return si_->distance(a->state, b->state);
-    ompl::base::State* state_a = a->state;
-    ompl::base::State* state_b = b->state;
-
-    // const ompl::base::CompoundState* sa = dynamic_cast<const ompl::base::CompoundState*> (state_a);
-    // const ompl::base::CompoundState* sb = dynamic_cast<const ompl::base::CompoundState*> (state_b);
     
-    // return sqrt( pow((sa->as<ompl::base::SE2StateSpace::StateType>(1)->getX() - sb->as<ompl::base::SE2StateSpace::StateType>(1)->getX()),2) + 
-    //              pow((sa->as<ompl::base::SE2StateSpace::StateType>(1)->getY() - sb->as<ompl::base::SE2StateSpace::StateType>(1)->getY()),2) +
-    //              pow((sa->as<ompl::base::SE2StateSpace::StateType>(1)->getYaw() - sb->as<ompl::base::SE2StateSpace::StateType>(1)->getYaw()),2) );
-  
-    const ompl::base::RealVectorWeightedStateSpace::StateType* sa = state_a->as<ompl::base::RealVectorWeightedStateSpace::StateType>();
-    const ompl::base::RealVectorWeightedStateSpace::StateType* sb = state_b->as<ompl::base::RealVectorWeightedStateSpace::StateType>();
+    return si_->distance(a->state, b->state);
+    
+    // TODO(Karthik) : Find a cleaner way to link to the appropriate StateSpace
+    // Below is the correct version
 
-    return sqrt( pow((sa->values[9] - sb->values[9]),2) + 
-                 pow((sa->values[10] - sb->values[10]),2) +
-                 pow((sa->values[11] - sb->values[11]),2) );
+    // ompl::base::State* state_a = a->state;
+    // ompl::base::State* state_b = b->state;
+
+    // const ompl::base::RealVectorWeightedStateSpace::StateType* sa = state_a->as<ompl::base::RealVectorWeightedStateSpace::StateType>();
+    // const ompl::base::RealVectorWeightedStateSpace::StateType* sb = state_b->as<ompl::base::RealVectorWeightedStateSpace::StateType>();
+
+    // return sqrt( pow((sa->values[9] - sb->values[9]),2) + 
+    //              pow((sa->values[10] - sb->values[10]),2) +
+    //              pow((sa->values[11] - sb->values[11]),2) );
+
   }
 
   // Add the edge between state->parent to state to the monolithic tree. This

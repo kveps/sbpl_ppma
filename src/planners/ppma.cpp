@@ -28,9 +28,9 @@
  */
 #include <sbpl/planners/ppma.h>
 
-#include "/usr/local/include/ompl/base/ProblemDefinition.h"
-#include "/usr/local/include/ompl/tools/config/SelfConfig.h"
-#include "/usr/local/include/ompl/geometric/PathGeometric.h"
+#include <ompl/base/ProblemDefinition.h>
+#include <ompl/tools/config/SelfConfig.h>
+#include <ompl/geometric/PathGeometric.h>
 
 #include <utility>
 
@@ -893,8 +893,8 @@ bool PPMAPlanner::Search(vector<int> &pathIds, int &PathCost) {
 
         //run weighted A*
         
-        chrono::time_point<chrono::monotonic_clock> start, end;
-        start = chrono::monotonic_clock::now();
+        chrono::time_point<chrono::steady_clock> start, end;
+        start = chrono::steady_clock::now();
 
         int before_expands = search_expands;
         clock_t before_time = clock();
@@ -904,7 +904,7 @@ bool PPMAPlanner::Search(vector<int> &pathIds, int &PathCost) {
         //2 if it ran out of time
         int ret = ImprovePath();
 
-        end = chrono::monotonic_clock::now();
+        end = chrono::steady_clock::now();
 
         if (ret == 1) { //solution found for this iteration
             eps_satisfied = eps;
